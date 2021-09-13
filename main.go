@@ -4,6 +4,7 @@ import (
 	do "do/digitalocean"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -22,12 +23,17 @@ func main() {
 		return
 	}
 
-	r, err := client.Servers()
+	servers := do.RemoteEntities{}
+
+	err = client.Servers(&servers)
 
 	if err != nil {
 		fmt.Printf("Error, %v\n", err)
 		return
 	}
 
-	fmt.Println("r", r)
+	for _, server := range servers.Droplets {
+		fmt.Printf("-> %s - %s (tags: %v)\n", server.Name, server.Networks.Version[0].IP, strings.Join(server.Tags, "; "))
+	}
+
 }

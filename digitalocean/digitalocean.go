@@ -1,10 +1,12 @@
 package digitalocean
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 )
 
 type Digitalocean struct {
@@ -14,30 +16,37 @@ type Digitalocean struct {
 
 func NewDigitaloceanClient(URL, token string) (Digitalocean, error) {
 
-	// url check here: u, err := url.Parse("http://foo")
-	// auth
-
 	return Digitalocean{URL, token}, nil
 }
 
-func (d Digitalocean) Servers() (io.ReadCloser, error) {
+func (d Digitalocean) Servers(serversModel interface{}) error {
 
-	return d.request("GET", "/v2/droplets?page=1&per_page=20")
+	r, err := d.request("GET", "/v2/droplets?page=1&per_page=20")
+
+	err = json.Unmarshal(r, &serversModel)
+
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
-func (d Digitalocean) request(method, uri string) (io.ReadCloser, error) {
+func (d Digitalocean) request(method, uri string) ([]byte, error) {
 
 	// check method here
 	//
 	//
 
-	p, err := url.Parse(d.URL + "/" + uri)
+	p, err := url.Parse(d.URL)
+
+	realURL := p.Scheme + "://" + path.Join(p.Host, uri)
 
 	if err != nil {
-		return nil, fmt.Errorf("Couldnt parse URL: %s", d.URL+"/"+uri)
+		return nil, fmt.Errorf("Couldnt parse URL: %s", realURL)
 	}
 
-	req, err := http.NewRequest(method, p.String(), nil)
+	req, err := http.NewRequest(method, realURL, nil)
 
 	if err != nil {
 		return nil, err
@@ -54,5 +63,12 @@ func (d Digitalocean) request(method, uri string) (io.ReadCloser, error) {
 	}
 	defer res.Body.Close()
 
-	return res.Body, nil
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// fmt.Println(string(body))
+
+	return body, nil
 }
