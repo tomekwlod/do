@@ -23,6 +23,10 @@ func (d Digitalocean) Servers(serversModel interface{}) error {
 
 	r, err := d.request("GET", "/v2/droplets?page=1&per_page=20")
 
+	if err != nil {
+		return err
+	}
+
 	err = json.Unmarshal(r, &serversModel)
 
 	if err != nil {
