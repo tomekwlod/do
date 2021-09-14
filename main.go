@@ -5,7 +5,6 @@ import (
 	"do/vpc"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 
@@ -15,10 +14,6 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
-// type ClientInterface interface {
-// 	Servers(interface{}) error
-// }
-
 func main() {
 	err := godotenv.Load()
 
@@ -27,19 +22,20 @@ func main() {
 		return
 	}
 
-	sshpath := os.Getenv("SSH_PATH")
-	if sshpath == "" {
-		log.Fatal("No ssh path provived, expected SSH_PATH in env file (where are your ssh files?)")
+	dotoken := os.Getenv("DO_TOKEN")
+
+	if dotoken == "" {
+		fmt.Println("No DO_TOKEN env provived")
+		return
 	}
 
-	client, err := do.NewDigitaloceanClient("https://api.digitalocean.com/", os.Getenv("DO_TOKEN"))
+	client, err := do.NewDigitaloceanClient("https://api.digitalocean.com/", dotoken)
 
 	if err != nil {
 		fmt.Printf("Error, %v\n", err)
 		return
 	}
 
-	// initialize an empty model struct
 	servers := do.RemoteEntities{}
 
 	err = client.Servers(&servers)
@@ -49,19 +45,43 @@ func main() {
 		return
 	}
 
-	key, err := ioutil.ReadFile(path.Join(sshpath, "id_rsa"))
-	if err != nil {
-		log.Fatalf("unable to read private key: %v", err)
+	// all good, now start with the VPCs
+
+	sshpath := os.Getenv("SSH_PATH")
+
+	if sshpath == "" {
+		fmt.Println("No ssh path provived, expected SSH_PATH in env file (where are your ssh files?)")
+		return
 	}
-	// Create the Signer for this private key.
-	signer, err := ssh.ParsePrivateKey(key)
+
+	key, err := ioutil.ReadFile(path.Join(sshpath, "id_rsa"))
+
 	if err != nil {
-		log.Fatalf("unable to parse private key: %v", err)
+		fmt.Printf("Unable to read a private key: %v", err)
+		return
+	}
+
+	// Create the Signer for the private key.
+	signer, err := ssh.ParsePrivateKey(key)
+
+	if err != nil {
+		fmt.Printf("Unable to parse private key: %v", err)
+		return
 	}
 
 	hostKeyCallback, err := knownhosts.New(path.Join(sshpath, "known_hosts"))
+
 	if err != nil {
-		log.Fatal("could not create hostkeycallback function: ", err)
+		fmt.Printf("Could not create hostkeycallback function: %v", err)
+		return
+	}
+
+	config := &ssh.ClientConfig{
+		User: "root",
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(signer),
+		},
+		HostKeyCallback: hostKeyCallback,
 	}
 
 	for _, server := range servers.Droplet {
@@ -73,19 +93,10 @@ func main() {
 		}
 
 		if utils.SliceContains(server.Tags, "k8s") {
-
 			continue
 		}
 
-		config := &ssh.ClientConfig{
-			User: "root",
-			Auth: []ssh.AuthMethod{
-				ssh.PublicKeys(signer),
-			},
-			HostKeyCallback: hostKeyCallback,
-		}
-
-		v := vpc.NewVPC(IP, "22", config)
+		v := vpc.NewVPC(IP, 22, config)
 
 		cmd := "df /home | awk '{ print $5 }' | tail -n 1 | sed 's/%//'"
 

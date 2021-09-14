@@ -10,16 +10,16 @@ import (
 type VPC struct {
 	Config *ssh.ClientConfig
 	IP     string
-	Port   string
+	Port   int
 }
 
-func NewVPC(ip, port string, config *ssh.ClientConfig) *VPC {
+func NewVPC(ip string, port int, config *ssh.ClientConfig) *VPC {
 
 	return &VPC{IP: ip, Port: port, Config: config}
 }
 
 func (v *VPC) dial() (*ssh.Client, error) {
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%s", v.IP, v.Port), v.Config)
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", v.IP, v.Port), v.Config)
 
 	if err != nil {
 		return nil, err
