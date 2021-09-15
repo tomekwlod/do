@@ -4,15 +4,19 @@ import (
 	do "do/digitalocean"
 	"do/vpc"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 
 	"github.com/joho/godotenv"
 	"github.com/tomekwlod/utils"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/knownhosts"
 )
+
+//
+// TODO:
+// - let's standarize the way we receive argument/envs!!
+// - concurrency/goroutines
+// - standarize error handling
+//
 
 func main() {
 	err := godotenv.Load()
@@ -45,45 +49,6 @@ func main() {
 		return
 	}
 
-	// all good, now start with the VPCs
-
-	sshpath := os.Getenv("SSH_PATH")
-
-	if sshpath == "" {
-		fmt.Println("No ssh path provived, expected SSH_PATH in env file (where are your ssh files?)")
-		return
-	}
-
-	key, err := ioutil.ReadFile(path.Join(sshpath, "id_rsa"))
-
-	if err != nil {
-		fmt.Printf("Unable to read a private key: %v", err)
-		return
-	}
-
-	// Create the Signer for the private key.
-	signer, err := ssh.ParsePrivateKey(key)
-
-	if err != nil {
-		fmt.Printf("Unable to parse private key: %v", err)
-		return
-	}
-
-	hostKeyCallback, err := knownhosts.New(path.Join(sshpath, "known_hosts"))
-
-	if err != nil {
-		fmt.Printf("Could not create hostkeycallback function: %v", err)
-		return
-	}
-
-	config := &ssh.ClientConfig{
-		User: "root",
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
-		HostKeyCallback: hostKeyCallback,
-	}
-
 	for _, server := range servers.Droplet {
 
 		IP := server.PublicIP()
@@ -96,11 +61,21 @@ func main() {
 			continue
 		}
 
-		v := vpc.NewVPC(IP, 22, config)
+		sshpath := os.Getenv("SSH_PATH")
+		sshuser := os.Getenv("SSH_USER")
+
+		vpc, err := vpc.NewVPC(IP, 22, sshuser, vpc.AuthWithKey(path.Join(sshpath, "id_rsa"), path.Join(sshpath, "known_hosts")))
+
+		if err != nil {
+			fmt.Printf("[%s] Error: %v\n", server.Name, err)
+			continue
+		}
+
+		defer vpc.Close()
 
 		cmd := "df /home | awk '{ print $5 }' | tail -n 1 | sed 's/%//'"
 
-		res, err := v.ExecuteCommand(cmd)
+		res, err := vpc.ExecuteCommand(cmd)
 
 		if err != nil {
 			fmt.Printf("Problem with executing command '%s': %v\n", cmd, err)

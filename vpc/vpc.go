@@ -8,50 +8,46 @@ import (
 )
 
 type VPC struct {
-	Config *ssh.ClientConfig
-	IP     string
-	Port   int
+	client     *ssh.Client
+	IP         string
+	Port       int
+	User       string
+	AuthMethod AuthMethod
 }
 
-func NewVPC(ip string, port int, config *ssh.ClientConfig) *VPC {
+// NewVPC initializes and dials to the server
+func NewVPC(ip string, port int, user string, authMethod AuthMethod) (*VPC, error) {
 
-	return &VPC{IP: ip, Port: port, Config: config}
-}
-
-func (v *VPC) dial() (*ssh.Client, error) {
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", v.IP, v.Port), v.Config)
+	auth, hostKeyCallback, err := authMethod.method() // call it prepare
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Prepare method error: %v", err)
 	}
 
-	return client, nil
+	config := &ssh.ClientConfig{
+		User:            user,
+		Auth:            []ssh.AuthMethod{auth},
+		HostKeyCallback: hostKeyCallback,
+	}
 
-	// defer client.Close()
-}
-
-func (v *VPC) createSession(client *ssh.Client) (*ssh.Session, error) {
-	// Each ClientConn can support multiple interactive sessions,
-	// represented by a Session.
-	session, err := client.NewSession()
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", ip, port), config)
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create session: %v", err)
+		return nil, fmt.Errorf("Error while dialing: %v", err)
 	}
 
-	return session, nil
+	return &VPC{IP: ip, Port: port, User: user, client: client}, nil
 }
 
+// Close closes the client connection
+func (vpc *VPC) Close() error {
+	return vpc.client.Close()
+}
+
+// ExecuteCommand executes provided command and returns a response in string format
 func (v *VPC) ExecuteCommand(cmd string) (string, error) {
-	client, err := v.dial()
 
-	if err != nil {
-		return "", fmt.Errorf("Failed to dial: %v", err)
-	}
-
-	defer client.Close()
-
-	session, err := v.createSession(client)
+	session, err := v.client.NewSession()
 
 	if err != nil {
 		return "", fmt.Errorf("Failed to create session: %v", err)
