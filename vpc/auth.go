@@ -63,7 +63,7 @@ func (k keyCallback) method() (ssh.AuthMethod, ssh.HostKeyCallback, error) {
 	signer, err := ssh.ParsePrivateKey(key)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to parse private key: %v", err)
+		return nil, nil, fmt.Errorf("Unable to parse a private key: %v", err)
 	}
 
 	auth := ssh.PublicKeys(signer)
