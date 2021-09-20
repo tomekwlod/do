@@ -10,18 +10,33 @@ import (
 )
 
 type Digitalocean struct {
-	URL   string
-	token string
+	client HttpClient
+	URL    string //api url
+	token  string //access token in order to login
 }
 
-func NewDigitaloceanClient(URL, token string) (Digitalocean, error) {
+type HttpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
 
-	return Digitalocean{URL, token}, nil
+func NewDigitaloceanClient(client HttpClient, URL, token string) (Digitalocean, error) {
+
+	return Digitalocean{client, URL, token}, nil
 }
 
 func (d Digitalocean) Servers(serversModel interface{}) error {
 
-	r, err := d.request("GET", "/v2/droplets?page=1&per_page=20")
+	uri := "/v2/droplets?page=1&per_page=20"
+
+	p, err := url.Parse(d.URL)
+
+	realURL := p.Scheme + "://" + path.Join(p.Host, uri)
+	fmt.Println(realURL)
+	if err != nil {
+		return fmt.Errorf("Couldnt parse URL: %s", realURL)
+	}
+
+	r, err := d.request("GET", realURL)
 
 	if err != nil {
 		return err
@@ -36,21 +51,9 @@ func (d Digitalocean) Servers(serversModel interface{}) error {
 	return err
 }
 
-func (d Digitalocean) request(method, uri string) ([]byte, error) {
+func (d Digitalocean) request(method, url string) ([]byte, error) {
 
-	// check method here
-	//
-	//
-
-	p, err := url.Parse(d.URL)
-
-	realURL := p.Scheme + "://" + path.Join(p.Host, uri)
-
-	if err != nil {
-		return nil, fmt.Errorf("Couldnt parse URL: %s", realURL)
-	}
-
-	req, err := http.NewRequest(method, realURL, nil)
+	req, err := http.NewRequest(method, url, nil)
 
 	if err != nil {
 		return nil, err
@@ -60,8 +63,7 @@ func (d Digitalocean) request(method, uri string) ([]byte, error) {
 	req.Header.Add("cache-control", "no-cache")
 	req.Header.Add("Authorization", "Bearer "+d.token)
 
-	res, err := http.DefaultClient.Do(req)
-
+	res, err := d.client.Do(req)
 	if err != nil {
 		return nil, err
 	}

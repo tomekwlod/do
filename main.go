@@ -4,6 +4,7 @@ import (
 	do "do/digitalocean"
 	"do/vpc"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -13,6 +14,9 @@ import (
 //
 // TODO:
 // - concurrency/goroutines
+// - tests
+// - maybe sending emails/teams when >80% detected
+// - save history to a database
 //
 
 func main() {
@@ -30,7 +34,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	client, err := do.NewDigitaloceanClient("https://api.digitalocean.com/", dotoken)
+	client, err := do.NewDigitaloceanClient(http.DefaultClient, "https://api.digitalocean.com/", dotoken)
 
 	if err != nil {
 		fmt.Printf("An error occured while connecting to DO:\n%v", err)
