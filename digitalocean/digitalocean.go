@@ -31,7 +31,7 @@ func (d Digitalocean) Servers(serversModel interface{}) error {
 	p, err := url.Parse(d.URL)
 
 	realURL := p.Scheme + "://" + path.Join(p.Host, uri)
-	fmt.Println(realURL)
+
 	if err != nil {
 		return fmt.Errorf("Couldnt parse URL: %s", realURL)
 	}

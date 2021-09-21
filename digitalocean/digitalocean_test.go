@@ -10,7 +10,10 @@ import (
 type fakeClient struct{}
 
 func (fc fakeClient) Do(req *http.Request) (*http.Response, error) {
-	return &http.Response{Body: io.NopCloser(strings.NewReader(`{"hello":"there"}`)), StatusCode: 200}, nil
+	rc := io.NopCloser(strings.NewReader(`{"hello":"there"}`))
+	defer rc.Close()
+
+	return &http.Response{Body: rc, StatusCode: 200}, nil
 }
 
 func TestServers(t *testing.T) {
